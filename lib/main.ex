@@ -24,11 +24,21 @@ defmodule Server do
     IO.puts("Path: #{path}")
 
     # Write the response
+    success_with_content_data = fn data ->
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: #{byte_size(data)}\r\n\r\n#{data}"
+    end
+
     case method do
       "GET" ->
         case path do
-          "/" -> :gen_tcp.send(client, "HTTP/1.1 200 OK\r\n\r\n")
-          _ -> :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
+          "/" ->
+            :gen_tcp.send(client, "HTTP/1.1 200 OK\r\n\r\n")
+
+          "/echo/" <> message ->
+            :gen_tcp.send(client, success_with_content_data.(message))
+
+          _ ->
+            :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
         end
 
       _ ->
