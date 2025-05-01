@@ -15,10 +15,25 @@ defmodule Server do
     {:ok, client} = :gen_tcp.accept(socket)
 
     # Read the request
-    {:ok, _request} = :gen_tcp.recv(client, 0)
+    {:ok, request} = :gen_tcp.recv(client, 0)
+
+    # Process the request
+    # get the request method and path
+    [method, path | _] = String.split(request, " ")
+    IO.puts("Method: #{method}")
+    IO.puts("Path: #{path}")
+
     # Write the response
-    response = "HTTP/1.1 200 OK\r\n\r\n"
-    :gen_tcp.send(client, response)
+    case method do
+      "GET" ->
+        case path do
+          "/" -> :gen_tcp.send(client, "HTTP/1.1 200 OK\r\n\r\n")
+          _ -> :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
+        end
+
+      _ ->
+        :gen_tcp.send(client, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")
+    end
 
     # Close the socket
     :gen_tcp.close(client)
