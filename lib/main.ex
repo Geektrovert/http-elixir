@@ -17,8 +17,7 @@ defmodule Server do
 
   defp loop_accept(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
-    # handle the request (your existing logic, refactored into a function)
-    handle_client(client)
+    spawn(fn -> handle_client(client) end)
     loop_accept(socket)
   end
 
