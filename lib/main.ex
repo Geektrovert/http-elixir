@@ -12,8 +12,17 @@ defmodule Server do
     # Since the tester restarts your program quite often, setting SO_REUSEADDR
     # ensures that we don't run into 'Address already in use' errors
     {:ok, socket} = :gen_tcp.listen(4221, [:binary, active: false, reuseaddr: true])
-    {:ok, client} = :gen_tcp.accept(socket)
+    loop_accept(socket)
+  end
 
+  defp loop_accept(socket) do
+    {:ok, client} = :gen_tcp.accept(socket)
+    # handle the request (your existing logic, refactored into a function)
+    handle_client(client)
+    loop_accept(socket)
+  end
+
+  def handle_client(client) do
     # Read the request
     {:ok, request} = :gen_tcp.recv(client, 0)
 
@@ -37,6 +46,18 @@ defmodule Server do
           "/echo/" <> message ->
             :gen_tcp.send(client, success_with_content_data.(message))
 
+          "/user-agent" ->
+            user_agent =
+              request
+              |> String.split("\r\n")
+              |> Enum.find(fn line -> String.starts_with?(line, "User-Agent: ") end)
+              |> case do
+                nil -> ""
+                line -> String.replace_prefix(line, "User-Agent: ", "")
+              end
+
+            :gen_tcp.send(client, success_with_content_data.(user_agent))
+
           _ ->
             :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
         end
@@ -47,7 +68,6 @@ defmodule Server do
 
     # Close the socket
     :gen_tcp.close(client)
-    :gen_tcp.close(socket)
   end
 end
 
