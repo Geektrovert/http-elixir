@@ -75,6 +75,22 @@ defmodule Server do
             :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
         end
 
+      "POST" ->
+        case path do
+          "/files/" <> file_name ->
+            directory = Application.get_env(:codecrafters_http_server, :directory, ".")
+            full_path = Path.join(directory, file_name)
+            [_, body] = String.split(request, "\r\n\r\n", parts: 2)
+
+            case File.write(full_path, body) do
+              :ok -> :gen_tcp.send(client, "HTTP/1.1 201 Created\r\n\r\n")
+              _ -> :gen_tcp.send(client, "HTTP/1.1 500 Internal Server Error\r\n\r\n")
+            end
+
+          _ ->
+            :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
+        end
+
       _ ->
         :gen_tcp.send(client, "HTTP/1.1 405 Method Not Allowed\r\n\r\n")
     end
