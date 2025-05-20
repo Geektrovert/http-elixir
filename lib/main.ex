@@ -31,11 +31,6 @@ defmodule Server do
     IO.puts("Method: #{method}")
     IO.puts("Path: #{path}")
 
-    # Write the response
-    success_with_content_data = fn data ->
-      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: #{byte_size(data)}\r\n\r\n#{data}"
-    end
-
     case method do
       "GET" ->
         case path do
@@ -43,7 +38,7 @@ defmodule Server do
             :gen_tcp.send(client, "HTTP/1.1 200 OK\r\n\r\n")
 
           "/echo/" <> message ->
-            :gen_tcp.send(client, success_with_content_data.(message))
+            :gen_tcp.send(client, success_with_content_data(message))
 
           "/user-agent" ->
             user_agent =
@@ -55,7 +50,26 @@ defmodule Server do
                 line -> String.replace_prefix(line, "User-Agent: ", "")
               end
 
-            :gen_tcp.send(client, success_with_content_data.(user_agent))
+            :gen_tcp.send(client, success_with_content_data(user_agent))
+
+          "/files" <> file_path ->
+            directory = Application.get_env(:codecrafters_http_server, :directory, ".")
+            # Clean up file_path (remove leading slash if present)
+            file_path = String.trim_leading(file_path, "/")
+            full_path = Path.join(directory, file_path)
+
+            IO.puts("Reading file in path: #{full_path}")
+
+            case File.read(full_path) do
+              {:ok, contents} ->
+                :gen_tcp.send(
+                  client,
+                  success_with_content_data(contents, "application/octet-stream")
+                )
+
+              {:error, _} ->
+                :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
+            end
 
           _ ->
             :gen_tcp.send(client, "HTTP/1.1 404 Not Found\r\n\r\n")
@@ -68,10 +82,19 @@ defmodule Server do
     # Close the socket
     :gen_tcp.close(client)
   end
+
+  defp success_with_content_data(data, content_type \\ "text/plain") do
+    "HTTP/1.1 200 OK\r\nContent-Type: #{content_type}\r\nContent-Length: #{byte_size(data)}\r\n\r\n#{data}"
+  end
 end
 
 defmodule CLI do
-  def main(_args) do
+  def main(args) do
+    # Parse --directory flag
+    {opts, _args, _invalid} = OptionParser.parse(args, switches: [directory: :string])
+    directory = opts[:directory] || "."
+    Application.put_env(:codecrafters_http_server, :directory, directory)
+
     # Start the Server application
     {:ok, _pid} = Application.ensure_all_started(:codecrafters_http_server)
 
