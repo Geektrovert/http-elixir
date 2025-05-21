@@ -1,14 +1,11 @@
 defmodule Server do
-  use Application
   alias Utils
   require Logger
 
   # Set Logger format at runtime since no config file is present
   Logger.configure_backend(:console, format: "[$time] [$level] $message\n")
 
-  def start(_type, _args) do
-    Logger.info("[app_start] Application starting...")
-    # Force-load all route modules so escript includes them
+  def main(args) do
     _ = [
       Routes.Root.module_info(),
       Routes.Echo.module_info(),
@@ -17,11 +14,19 @@ defmodule Server do
       Routes.NotFound.module_info()
     ]
 
+    {opts, _, _} = OptionParser.parse(args, switches: [directory: :string])
+    directory = opts[:directory] || "."
+    Application.put_env(:server, :directory, directory)
+    Logger.info("[main] Using file directory: #{directory}")
+
+    # Start your supervision tree here
     children = [
       {Server.Listener, []}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
+
+    Process.sleep(:infinity)
   end
 
   def handle_client(client) do
@@ -70,11 +75,17 @@ defmodule Server do
 
     result =
       try do
-        if function_exported?(mod, String.to_atom(fun), 2) do
-          apply(mod, String.to_atom(fun), [path, req])
-        else
-          Logger.info("[method_not_allowed] module=#{inspect(mod)} function=#{fun}")
-          {405, "Method Not Allowed", "", "text/plain"}
+        cond do
+          not Code.ensure_loaded?(mod) ->
+            Logger.info("[not_found] module=#{inspect(mod)} not loaded")
+            {404, "Not Found", "", "text/plain"}
+
+          not function_exported?(mod, String.to_atom(fun), 2) ->
+            Logger.info("[method_not_allowed] module=#{inspect(mod)} function=#{fun}")
+            {405, "Method Not Allowed", "", "text/plain"}
+
+          true ->
+            apply(mod, String.to_atom(fun), [path, req])
         end
       rescue
         UndefinedFunctionError ->
@@ -117,9 +128,5 @@ defmodule Server do
       end
 
     Module.concat(Routes, mod_name)
-  end
-
-  def main(_args) do
-    Process.sleep(:infinity)
   end
 end
