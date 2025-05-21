@@ -46,7 +46,7 @@ defmodule Server do
           {:ok, method, path, headers, body, rest} ->
             Logger.info("[request] method=#{method} path=#{path}")
             close? = Utils.connection_close?(headers)
-            handle_request(method, path, headers, body, client)
+            handle_request(method, path, headers, body, client, close?)
             if close?, do: :ok, else: loop_handle_requests(client, rest)
 
           :incomplete ->
@@ -62,7 +62,7 @@ defmodule Server do
     end
   end
 
-  def handle_request(method, path, headers, body, client) do
+  def handle_request(method, path, headers, body, client, connection_close \\ false) do
     req = %{headers: headers, body: body}
     mod = route_module_from_path(path)
     fun = String.downcase(method)
@@ -110,11 +110,26 @@ defmodule Server do
           "[response] status=#{status} content_type=#{content_type} encoding=#{encoding}"
         )
 
-        Utils.send_response(client, "#{status} #{status_text}", resp_body, content_type, encoding)
+        Utils.send_response(
+          client,
+          "#{status} #{status_text}",
+          resp_body,
+          content_type,
+          encoding,
+          connection_close
+        )
 
       {status, status_text, resp_body, content_type} ->
         Logger.info("[response] status=#{status} content_type=#{content_type}")
-        Utils.send_response(client, "#{status} #{status_text}", resp_body, content_type)
+
+        Utils.send_response(
+          client,
+          "#{status} #{status_text}",
+          resp_body,
+          content_type,
+          nil,
+          connection_close
+        )
     end
   end
 

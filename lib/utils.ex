@@ -20,16 +20,25 @@ defmodule Utils do
     end
   end
 
-  def send_response(client, status, body, content_type, encoding \\ nil) do
+  def send_response(
+        client,
+        status,
+        body,
+        content_type,
+        encoding \\ nil,
+        connection_close \\ false
+      ) do
     headers =
       [
         "HTTP/1.1 #{status}",
         "Content-Type: #{content_type}",
         "Content-Length: #{byte_size(body)}"
-      ] ++ if encoding, do: ["Content-Encoding: #{encoding}"], else: []
+      ] ++
+        if(encoding, do: ["Content-Encoding: #{encoding}"], else: []) ++
+        if connection_close, do: ["Connection: close"], else: []
 
     Logger.info(
-      "[send_response] status=#{status} content_type=#{content_type} encoding=#{inspect(encoding)} length=#{byte_size(body)}"
+      "[send_response] status=#{status} content_type=#{content_type} encoding=#{inspect(encoding)} length=#{byte_size(body)} connection_close=#{connection_close}"
     )
 
     :gen_tcp.send(client, Enum.join(headers, "\r\n") <> "\r\n\r\n" <> body)
