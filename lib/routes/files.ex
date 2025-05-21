@@ -5,7 +5,7 @@ defmodule Routes.Files do
     Logger.info("[route_entry] module=Files method=GET path=#{path}")
     accept_encoding = Utils.get_header(req.headers, "Accept-Encoding") || ""
     file_name = String.replace_prefix(path, "/files/", "")
-    directory = Application.get_env(:codecrafters_http_server, :directory, ".")
+    directory = Application.get_env(:server, :directory, ".")
     full_path = Path.join(directory, file_name)
 
     case File.read(full_path) do
@@ -25,7 +25,7 @@ defmodule Routes.Files do
   def post(path, req) do
     content_encoding = Utils.get_header(req.headers, "Content-Encoding") || ""
     file_name = String.replace_prefix(path, "/files/", "")
-    directory = Application.get_env(:codecrafters_http_server, :directory, ".")
+    directory = Application.get_env(:server, :directory, ".")
     full_path = Path.join(directory, file_name)
     data = Utils.decompress_req(req.body, content_encoding)
 
